@@ -23,7 +23,7 @@ A complete face recognition door access control system that can detect and recog
 - **NumPy** - For numerical computations
 - **pyttsx3** - For voice greetings
 - **Flask** - For web dashboard
-- **RPi.GPIO** - For Raspberry Pi GPIO control (optional)
+- **RPi** - For Raspberry Pi 
 
 ## Installation
 
@@ -240,5 +240,6 @@ This project is open source and available under the MIT License.
 
 
 Contributions are welcome! Feel free to submit issues and pull requests.
+
 
 
