@@ -35,6 +35,11 @@ A complete face recognition door access control system that can detect and recog
 ### Install Dependencies
 
 1. Clone or download this repository
+
+```bash
+gh repo clone mohit12-cpu/demo_gate11
+```
+
 2. Navigate to the project directory
 3. Install the required packages:
 
@@ -55,7 +60,7 @@ pip install face-recognition
 
 ### 1. Register New Users
 
-To add new authorized users to the system:
+To add new authorised users to the system:
 
 ```bash
 python register.py
@@ -232,5 +237,6 @@ To connect a relay module to Raspberry Pi:
 This project is open source and available under the MIT License.
 
 ## Contributing
+
 
 Contributions are welcome! Feel free to submit issues and pull requests.
