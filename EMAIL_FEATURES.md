@@ -67,14 +67,6 @@ Created test scripts to verify functionality:
 - [test_email_simple.py](file:///p:/face%20door%20opening%20system%20111/test_email_simple.py): Standalone test of email with attachment functionality
 - [test_email_attachment.py](file:///p:/face%20door%20opening%20system%20111/test_email_attachment.py): Integrated test using the EmailNotifier class
 
-## Configuration
-
-Email settings are configured through environment variables:
-- `SMTP_SERVER`: smtp.gmail.com
-- `SMTP_PORT`: 587
-- `SENDER_EMAIL`: facialrecognitionandattendance@gmail.com
-- `SENDER_PASSWORD`: vrpo lozh zygn yzvw
-- `RECIPIENT_EMAIL`: shresthamanjil29@gmail.com
 
 These are automatically set by the [setup_gmail.py](file:///p:/face%20door%20opening%20system%20111/setup_gmail.py) script.
 
@@ -92,4 +84,5 @@ These are automatically set by the [setup_gmail.py](file:///p:/face%20door%20ope
 2. **Batch Processing**: Send multiple images in a single email for multiple detections
 3. **Cloud Storage**: Upload images to cloud storage for permanent retention
 4. **Privacy Features**: Blur or anonymize non-relevant areas in captured images
+
 5. **Customizable Alerts**: Configure which events trigger photo capture and emails
