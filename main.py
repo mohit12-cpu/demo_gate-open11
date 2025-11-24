@@ -3,59 +3,61 @@ import cv2
 import numpy as np
 import os
 import sys
-import pyttsx3
-import queue
-import threading
 import time
 from datetime import datetime
+import threading
+import queue
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-from database import db_manager
-
-# --- Simulated GPIO for door control ---
-class SimulatedGPIO:
-    """Simulates GPIO operations for door control"""
-    def __init__(self):
-        self.door_locked = True
-        self.relay_pin = 18  # Simulated relay pin
-    
-    def setup(self, pin, mode):
-        """Simulate GPIO setup"""
-        print(f"[GPIO] Setting up pin {pin} as {mode}")
-    
-    def output(self, pin, value):
-        """Simulate GPIO output"""
-        if value == 1:  # HIGH
-            self.door_locked = False
-            print(f"[GPIO] Pin {pin} set to HIGH - Door UNLOCKED")
-        else:  # LOW
-            self.door_locked = True
-            print(f"[GPIO] Pin {pin} set to LOW - Door LOCKED")
-    
-    def cleanup(self):
-        """Simulate GPIO cleanup"""
-        print("[GPIO] Cleaning up GPIO resources")
-
-# Try to import real GPIO libraries (for Raspberry Pi)
 try:
     import RPi.GPIO as GPIO
     GPIO_AVAILABLE = True
 except ImportError:
-    # Use simulated GPIO if real GPIO is not available
-    GPIO = SimulatedGPIO()
     GPIO_AVAILABLE = False
-    print("[INFO] Using simulated GPIO. Install RPi.GPIO for real hardware support.")
+
+from database import db_manager
+
+# Global queue for text-to-speech greetings
+global_greeting_queue = queue.Queue()
+
+# --- Logging System ---
+class DoorLogger:
+    """Handles logging of door access events"""
+    def __init__(self, log_file="door_access.log"):
+        self.log_file = log_file
+        self.ensure_log_file()
+    
+    def ensure_log_file(self):
+        """Create log file if it doesn't exist"""
+        if not os.path.exists(self.log_file):
+            with open(self.log_file, 'w') as f:
+                f.write("Timestamp,Event,Person\n")
+    
+    def log_event(self, event, person="N/A"):
+        """Log an event with timestamp"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"{timestamp},{event},{person}\n"
+        
+        # Print to console
+        print(f"[LOG] {timestamp} - {event} - {person}")
+        
+        # Write to file
+        with open(self.log_file, 'a') as f:
+            f.write(log_entry)
+        
+        # Also log to database
+        db_manager.log_access_event(event, person)
 
 # --- Email Notification System ---
 class EmailNotifier:
     """Sends email notifications for security events"""
-    def __init__(self, smtp_server=None, smtp_port=587, email=None, password=None, recipient=None):
+    def __init__(self, smtp_server=None, smtp_port=None, email=None, password=None, recipient=None):
         # Use provided values or fallback to environment variables or hardcoded defaults
         self.smtp_server = smtp_server or os.getenv('SMTP_SERVER') or 'smtp.gmail.com'
-        self.smtp_port = smtp_port
+        self.smtp_port = smtp_port or int(os.getenv('SMTP_PORT', 587))
         self.email = email or os.getenv('SENDER_EMAIL') or 'facialrecognitionandattendance@gmail.com'
         self.password = password or os.getenv('SENDER_PASSWORD') or 'vrpo lozh zygn yzvw'
         self.recipient = recipient or os.getenv('RECIPIENT_EMAIL') or 'shresthamanjil29@gmail.com'
@@ -103,33 +105,29 @@ class EmailNotifier:
             print(f"[EMAIL] Failed to send notification: {e}")
             return False
 
-# --- Logging System ---
-class DoorLogger:
-    """Handles logging of door access events"""
-    def __init__(self, log_file="door_access.log"):
-        self.log_file = log_file
-        self.ensure_log_file()
+# --- Simulated GPIO for door control ---
+class SimulatedGPIO:
+    """Simulates GPIO operations for door control"""
+    def __init__(self):
+        self.door_locked = True
+        self.relay_pin = 18  # Simulated relay pin
     
-    def ensure_log_file(self):
-        """Create log file if it doesn't exist"""
-        if not os.path.exists(self.log_file):
-            with open(self.log_file, 'w') as f:
-                f.write("Timestamp,Event,Person\n")
+    def setup(self, pin, mode):
+        """Simulate GPIO setup"""
+        print(f"[GPIO] Setting up pin {pin} as {mode}")
     
-    def log_event(self, event, person="N/A"):
-        """Log an event with timestamp"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = f"{timestamp},{event},{person}\n"
-        
-        # Print to console
-        print(f"[LOG] {timestamp} - {event} - {person}")
-        
-        # Write to file
-        with open(self.log_file, 'a') as f:
-            f.write(log_entry)
-        
-        # Also log to database
-        db_manager.log_access_event(event, person)
+    def output(self, pin, value):
+        """Simulate GPIO output"""
+        if value == 1:  # HIGH
+            self.door_locked = False
+            print(f"[GPIO] Pin {pin} set to HIGH - Door UNLOCKED")
+        else:  # LOW
+            self.door_locked = True
+            print(f"[GPIO] Pin {pin} set to LOW - Door LOCKED")
+    
+    def cleanup(self):
+        """Simulate GPIO cleanup"""
+        print("[GPIO] Cleaning up GPIO resources")
 
 # --- Door Control System ---
 class DoorController:
@@ -204,34 +202,6 @@ def handle_library_error(e):
     print("---")
     sys.exit(1)
 
-# --- Voice Greeting Setup ---
-greeting_queue = queue.Queue()
-
-def greeting_worker():
-    """Processes messages from a queue and speaks either greetings or alerts in a separate thread."""
-    engine = pyttsx3.init()
-    while True:
-        try:
-            message = greeting_queue.get()
-            # Check if this is an unknown person alert or a greeting for a known person
-            if message == "Unknown person detected":
-                alert = "Unknown person detected."
-                print(f"[Alert] Saying: '{alert}'")
-                engine.say(alert)
-            else:
-                # This is a greeting for a known person
-                greeting = f"Hello, {message}, welcome back."
-                print(f"[Greeting] Saying: '{greeting}'")
-                engine.say(greeting)
-            engine.runAndWait()
-            greeting_queue.task_done()
-        except Exception as e:
-            print(f"Error in greeting worker: {e}")
-
-# Start the greeting worker thread as a daemon so it closes with the main program
-threading.Thread(target=greeting_worker, daemon=True).start()
-
-
 # --- Main Application ---
 def main():
     # Initialize systems
@@ -294,6 +264,8 @@ def main():
     face_names = []
     process_this_frame = True
     last_unknown_capture_time = 0  # To track when we last captured an unknown person
+    last_unknown_face_encoding = None  # To track encoding of last unknown person
+    unknown_face_tolerance = 0.6  # Tolerance for comparing unknown faces
     
     try:
         while True:
@@ -337,7 +309,7 @@ def main():
                         # If a known person is found and not yet greeted, greet them and unlock door
                         if name not in greeted_this_session:
                             greeted_this_session.add(name)
-                            greeting_queue.put(name)
+                            global_greeting_queue.put(name)
                             door_controller.unlock_door(name)
                             logger.log_event("Authorized Access", name)
                             # Update user access in database
@@ -348,12 +320,31 @@ def main():
                         print("[ALERT] Unknown person detected!")
                         
                         # Speak "Unknown person detected" using text-to-speech
-                        greeting_queue.put("Unknown person detected")
+                        global_greeting_queue.put("Unknown person detected")
+                        
+                        # Check if this is likely the same unknown person as before
+                        should_capture = True
+                        current_time = time.time()
+                        
+                        # If we have a previous unknown face encoding, compare with current
+                        if last_unknown_face_encoding is not None:
+                            # Calculate distance between current and previous unknown face
+                            distance = face_recognition.face_distance([last_unknown_face_encoding], face_encoding)[0]
+                            # If distance is small (faces are similar), don't capture again
+                            if distance < unknown_face_tolerance:
+                                should_capture = False
+                                print("[INFO] Same unknown person detected, skipping capture")
+                        
+                        # Also apply time-based cooldown as backup
+                        if current_time - last_unknown_capture_time < 5:  # 5 second cooldown
+                            should_capture = False
+                            print("[INFO] Cooldown period active, skipping capture")
                         
                         # Capture only one clear image per unknown person detection
-                        # Use a cooldown period to avoid multiple captures of the same person
-                        current_time = time.time()
-                        if current_time - last_unknown_capture_time > 5:  # 5 second cooldown
+                        if should_capture:
+                            # Save encoding for comparison with next unknown face
+                            last_unknown_face_encoding = face_encoding
+                            
                             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                             image_filename = f"unknown_person_{timestamp}.jpg"
                             image_path = os.path.join("captured_images", image_filename)
@@ -372,6 +363,12 @@ def main():
                             last_unknown_capture_time = current_time
                 
             process_this_frame = not process_this_frame
+            
+            # Check if no faces were detected and speak alert
+            if len(face_locations) == 0:
+                # No faces detected in frame
+                print("[ALERT] No face detected!")
+                global_greeting_queue.put("Unknown person detected")
             
             # Display the results
             for (top, right, bottom, left), name in zip(face_locations, face_names):
@@ -401,5 +398,34 @@ def main():
         door_controller.cleanup()
         logger.log_event("System Stopped")
 
+def speak_greetings():
+    import pyttsx3
+    global global_greeting_queue
+    engine = pyttsx3.init()
+    while True:
+        try:
+            greeting = global_greeting_queue.get(timeout=1)
+            if greeting == "QUIT":
+                break
+            engine.say(greeting)
+            engine.runAndWait()
+        except queue.Empty:
+            continue
+
+
 if __name__ == "__main__":
-    main()
+    # Create captured_images directory if it doesn't exist
+    if not os.path.exists("captured_images"):
+        os.makedirs("captured_images")
+    
+    # Initialize the greeting queue and thread
+    global_greeting_queue = queue.Queue()
+    greeting_thread = threading.Thread(target=speak_greetings, daemon=True)
+    
+    # Start the greeting thread
+    greeting_thread.start()
+    
+    try:
+        main()
+    finally:
+        global_greeting_queue.put("QUIT")

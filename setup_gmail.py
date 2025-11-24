@@ -77,10 +77,10 @@ def test_email_configuration():
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = recipient_email
-        msg['Subject'] = "Face Recognition Door System - Test Email"
+        msg['Subject'] = "Face Recognition Door System - Email"
         
         body = f"""
-This is a test email from your Face Recognition Door System.
+This is a email from your Face Recognition Door System.
 Email notifications are now configured and working correctly.
 
 Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}

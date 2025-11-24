@@ -2,6 +2,7 @@ import face_recognition
 import cv2
 import os
 import sys
+import time
 from datetime import datetime
 import numpy as np
 from database import db_manager
@@ -33,6 +34,7 @@ def capture_user_images(name, num_images=3):
         # Display the resulting image
         cv2.imshow(f'Capture {captured_count+1}/{num_images} - Press "c" to capture, "q" to quit', frame)
         
+        # Use a short delay to allow for key press detection
         key = cv2.waitKey(1) & 0xFF
         if key == ord('c'):
             # Save the captured image
@@ -44,7 +46,7 @@ def capture_user_images(name, num_images=3):
             if captured_count < num_images:
                 print(f"Ready for image {captured_count+1}. Position yourself and press 'c' when ready.")
                 # Wait a bit before next capture
-                cv2.waitKey(1000)
+                time.sleep(1)
         elif key == ord('q'):
             break
     
@@ -112,7 +114,7 @@ def register_user():
         return
     
     # Check if user already exists
-    existing_files = [f for f in os.listdir('known_faces') if f.startswith(f"{name}_") and f.endswith(('.jpg', '_encoding.npy'))]
+    existing_files = [f for f in os.listdir('known_faces') if f.startswith(f"{name}_") and (f.endswith('.jpg') or f.endswith('_encoding.npy'))]
     if existing_files:
         response = input(f"User {name} already exists with {len(existing_files)} files. Overwrite? (y/n): ").strip().lower()
         if response != 'y':
